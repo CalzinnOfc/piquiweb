@@ -1,0 +1,9 @@
+.results-header { display: flex; align-items: center; gap: 20px; padding: 15px 30px; border-bottom: 1px solid #e0e0e0; background: white; }
+.mini-logo { height: 35px; }
+.search-form-mini input { height: 36px; padding: 0 15px; border-radius: 18px; border: 1px solid #ccc; width: 350px; }
+.results-container { padding: 20px 30px; max-width: 800px; }
+.result-card { margin-bottom: 20px; }
+.result-card h3 { margin: 0; }
+.result-card h3 a { color: #1a0dab; text-decoration: none; }
+.result-card .url { color: #006621; font-size: 13px; }
+.result-card p { color: #545454; font-size: 14px; margin-top: 5px; }
