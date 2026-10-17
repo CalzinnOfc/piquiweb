@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiquiWeb</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+</head>
+<body>
+    <header class="top-nav">
+        <a href="/preferences" class="nav-link">Preferências</a>
+        <a href="/stats" class="nav-link">Estatísticas</a>
+    </header>
+    <main class="main-container">
+        <div class="logo">
+            <img src="/static/img/logo.svg" alt="PiquiWeb">
+        </div>
+        <form action="/search" method="GET" class="search-form">
+            <div class="input-wrapper">
+                <input type="text" id="q" name="q" placeholder="Pesquisar com PiquiWeb..." autocomplete="off" autofocus>
+                <button type="submit" class="search-btn">
+                    <img src="/static/img/icons/search.svg" alt="Buscar">
+                </button>
+            </div>
+            <div id="autocomplete-box" class="autocomplete-box"></div>
+            <div class="categories">
+                <label><input type="radio" name="category" value="general" checked> Geral</label>
+                <label><input type="radio" name="category" value="images"> Imagens</label>
+                <label><input type="radio" name="category" value="videos"> Vídeos</label>
+                <label><input type="radio" name="category" value="news"> Notícias</label>
+                <label><input type="radio" name="category" value="it"> TI & Código</label>
+                <label><input type="radio" name="category" value="science"> Ciência</label>
+                <label><input type="radio" name="category" value="maps"> Mapas</label>
+            </div>
+        </form>
+    </main>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

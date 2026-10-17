@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ query }} - PiquiWeb</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/results.css">
+</head>
+<body>
+    <header class="results-header">
+        <a href="/"><img src="/static/img/logo.svg" class="mini-logo" alt="PiquiWeb"></a>
+        <form action="/search" method="GET" class="search-form-mini">
+            <input type="text" name="q" value="{{ query }}">
+            <button type="submit">Buscar</button>
+        </form>
+    </header>
+    <div class="results-container">
+        <h2>Resultados para: <i>{{ query }}</i> (Categoria: {{ category }})</h2>
+        <div class="result-card">
+            <h3><a href="https://example.com" target="_blank">Exemplo de Resultado de Busca</a></h3>
+            <span class="url">https://example.com</span>
+            <p>Este é um exemplo de resultado retornado pelas engrenagens de pesquisa do PiquiWeb.</p>
+        </div>
+    </div>
+</body>
+</html>
