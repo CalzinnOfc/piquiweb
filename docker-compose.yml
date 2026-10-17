@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  piquiweb:
+    build: .
+    container_name: piquiweb
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./settings.yml:/app/settings.yml
+    restart: unless-stopped
