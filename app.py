@@ -1,17 +1,53 @@
 import os
 from flask import Flask, render_template_string, request, jsonify
 import requests
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
-# Template da Página Inicial (Home)
+# Lista com os 30 motores e fontes integradas simultaneamente
+ENGINES = [
+    {"name": "DuckDuckGo", "url": lambda q: f"https://duckduckgo.com/html/?q={q}"},
+    {"name": "DDG HTML", "url": lambda q: f"https://html.duckduckgo.com/html/?q={q}"},
+    {"name": "DDG Lite", "url": lambda q: f"https://lite.duckduckgo.com/lite/"},
+    {"name": "Brave Search", "url": lambda q: f"https://search.brave.com/search?q={q}"},
+    {"name": "Yahoo Search", "url": lambda q: f"https://search.yahoo.com/search?p={q}"},
+    {"name": "Kagi", "url": lambda q: f"https://kagi.com/search?q={q}"},
+    {"name": "Mojeek", "url": lambda q: f"https://www.mojeek.com/search?q={q}"},
+    {"name": "Google", "url": lambda q: f"https://www.google.com/search?q={q}"},
+    {"name": "Bing", "url": lambda q: f"https://www.bing.com/search?q={q}"},
+    {"name": "Ecosia", "url": lambda q: f"https://www.ecosia.org/search?q={q}"},
+    {"name": "Startpage", "url": lambda q: f"https://www.startpage.com/sp/search?query={q}"},
+    {"name": "Qwant", "url": lambda q: f"https://www.qwant.com/?q={q}"},
+    {"name": "SearXNG Public", "url": lambda q: f"https://search.ononoki.org/search?q={q}"},
+    {"name": "Wikipedia", "url": lambda q: f"https://pt.wikipedia.org/w/index.php?search={q}"},
+    {"name": "GitHub", "url": lambda q: f"https://github.com/search?q={q}"},
+    {"name": "StackOverflow", "url": lambda q: f"https://stackoverflow.com/search?q={q}"},
+    {"name": "Reddit", "url": lambda q: f"https://www.reddit.com/search/?q={q}"},
+    {"name": "ArXiv", "url": lambda q: f"https://arxiv.org/search/?query={q}"},
+    {"name": "PubMed", "url": lambda q: f"https://pubmed.ncbi.nlm.nih.gov/?term={q}"},
+    {"name": "Wikidata", "url": lambda q: f"https://www.wikidata.org/w/index.php?search={q}"},
+    {"name": "OpenStreetMap", "url": lambda q: f"https://www.openstreetmap.org/search?query={q}"},
+    {"name": "Flickr", "url": lambda q: f"https://www.flickr.com/search/?text={q}"},
+    {"name": "Unsplash", "url": lambda q: f"https://unsplash.com/s/photos/{q}"},
+    {"name": "Pinterest", "url": lambda q: f"https://www.pinterest.com/search/pins/?q={q}"},
+    {"name": "YouTube", "url": lambda q: f"https://www.youtube.com/results?search_query={q}"},
+    {"name": "Vimeo", "url": lambda q: f"https://vimeo.com/search?q={q}"},
+    {"name": "Dailymotion", "url": lambda q: f"https://www.dailymotion.com/search/{q}"},
+    {"name": "Reuters", "url": lambda q: f"https://www.reuters.com/search/news?blob={q}"},
+    {"name": "BBC News", "url": lambda q: f"https://www.bbc.co.uk/search?q={q}"},
+    {"name": "CNN", "url": lambda q: f"https://edition.cnn.com/search?q={q}"}
+]
+
+# Template da Página Inicial
 INDEX_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PiquiWeb - Pesquisa</title>
+    <title>PiquiWeb - Metabuscador</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -24,14 +60,14 @@ INDEX_TEMPLATE = """
             margin: 0;
         }
         .logo-container {
-            margin-bottom: 25px;
+            margin-bottom: 30px;
             text-align: center;
         }
         h1 {
-            font-size: 52px;
+            font-size: 64px;
             color: #202124;
             margin: 0;
-            letter-spacing: -1px;
+            letter-spacing: -1.5px;
         }
         h1 span {
             color: #34A853;
@@ -39,27 +75,27 @@ INDEX_TEMPLATE = """
         .search-container {
             position: relative;
             width: 90%;
-            max-width: 580px;
+            max-width: 600px;
         }
         .search-bar {
             width: 100%;
-            height: 50px;
-            padding: 0 50px 0 20px;
+            height: 52px;
+            padding: 0 50px 0 22px;
             border-radius: 28px;
             border: 1px solid #dfe1e5;
             outline: none;
             font-size: 16px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
             box-sizing: border-box;
             background-color: #fff;
+            transition: box-shadow 0.2s;
         }
         .search-bar:focus {
-            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
-            border-color: rgba(223,225,229,0);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
         }
         .search-button {
             position: absolute;
-            right: 15px;
+            right: 18px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
@@ -67,25 +103,20 @@ INDEX_TEMPLATE = """
             cursor: pointer;
             font-size: 18px;
         }
-        .categories {
-            margin-top: 20px;
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            font-size: 14px;
-            color: #5f6368;
-        }
-        .categories label {
-            cursor: pointer;
+        .info-tag {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #70757a;
+            text-align: center;
         }
         .suggestions-box {
             position: absolute;
-            top: 55px;
+            top: 58px;
             left: 0;
             right: 0;
             background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 18px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
             overflow: hidden;
             z-index: 1000;
         }
@@ -106,15 +137,10 @@ INDEX_TEMPLATE = """
     </div>
     <div class="search-container">
         <form action="/search" method="GET">
-            <input type="text" id="query-input" name="q" class="search-bar" placeholder="Pesquisar no PiquiWeb..." autocomplete="off" autofocus>
+            <input type="text" id="query-input" name="q" class="search-bar" placeholder="Pesquisar em 30 motores simultaneamente..." autocomplete="off" autofocus>
             <button type="submit" class="search-button">🔍</button>
-            <div class="categories">
-                <label><input type="radio" name="category" value="general" checked> Geral</label>
-                <label><input type="radio" name="category" value="images"> Imagens</label>
-                <label><input type="radio" name="category" value="videos"> Vídeos</label>
-                <label><input type="radio" name="category" value="news"> Notícias</label>
-            </div>
         </form>
+        <div class="info-tag">Pesquisa simultânea em Brave, DuckDuckGo, Yahoo, Kagi, Mojeek e outras 25 fontes.</div>
         <div id="suggestions" class="suggestions-box"></div>
     </div>
 
@@ -152,7 +178,7 @@ INDEX_TEMPLATE = """
 </html>
 """
 
-# Template da Página de Resultados Interna
+# Template da Página de Resultados em Massa
 RESULTS_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -171,35 +197,41 @@ RESULTS_TEMPLATE = """
             align-items: center;
             padding: 15px 30px;
             border-bottom: 1px solid #ebebeb;
-            gap: 20px;
+            gap: 25px;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 100;
         }
         .logo {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: bold;
             text-decoration: none;
             color: #202124;
+            letter-spacing: -1px;
         }
         .logo span {
             color: #34A853;
         }
         .search-form-mini input {
-            width: 400px;
+            width: 420px;
             height: 40px;
             border-radius: 20px;
             border: 1px solid #dfe1e5;
-            padding: 0 20px;
+            padding: 0 18px;
             outline: none;
             font-size: 15px;
-            box-shadow: 0 1px 6px rgba(32,33,36,.1);
+            box-shadow: 0 1px 6px rgba(32,33,36,.08);
         }
         .content {
-            padding: 20px 30px;
-            max-width: 700px;
+            padding: 25px 30px;
+            max-width: 800px;
+            margin-left: 40px;
         }
         .info {
             color: #70757a;
-            font-size: 14px;
-            margin-bottom: 20px;
+            font-size: 13px;
+            margin-bottom: 22px;
         }
         .result-card {
             margin-bottom: 25px;
@@ -215,17 +247,25 @@ RESULTS_TEMPLATE = """
         .result-card .url {
             font-size: 13px;
             color: #006621;
+            margin-top: 2px;
+            margin-bottom: 3px;
+            word-break: break-all;
         }
         .result-card p {
             font-size: 14px;
             color: #4d5156;
-            margin-top: 4px;
+            margin: 0;
+            line-height: 1.4;
         }
-        .back-home {
+        .engine-badge {
             display: inline-block;
-            margin-top: 20px;
-            color: #1a0dab;
-            text-decoration: none;
+            background: #f1f3f4;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #5f6368;
+            margin-bottom: 4px;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -234,23 +274,58 @@ RESULTS_TEMPLATE = """
         <a href="/" class="logo">Piqui<span>Web</span></a>
         <form action="/search" method="GET" class="search-form-mini">
             <input type="text" name="q" value="{{ query }}">
-            <input type="hidden" name="category" value="{{ category }}">
         </form>
     </div>
     <div class="content">
-        <div class="info">Resultados para a pesquisa: <b>{{ query }}</b> (Categoria: {{ category }})</div>
-        
-        <div class="result-card">
-            <a href="https://www.google.com/search?q={{ query }}" target="_blank">Resultados da Web para {{ query }}</a>
-            <div class="url">https://www.piquiweb.com/search?q={{ query }}</div>
-            <p>Clique no link acima para ver os resultados completos indexados e processados pelas engrenagens de busca do PiquiWeb.</p>
-        </div>
+        <div class="info">Resultados combinados de <b>30 motores em simultâneo</b> para: <b>{{ query }}</b></div>
 
-        <a href="/" class="back-home">← Voltar à página inicial</a>
+        {% if results %}
+            {% for item in results %}
+            <div class="result-card">
+                <div class="engine-badge">{{ item.engine }}</div><br>
+                <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+                <div class="url">{{ item.url }}</div>
+                <p>{{ item.snippet }}</p>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>A procurar em simultâneo...</p>
+        {% endif %}
     </div>
 </body>
 </html>
 """
+
+def fetch_engine(engine_info, query):
+    engine_name = engine_info["name"]
+    res_list = []
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        target_url = engine_info["url"](query)
+        
+        if "lite.duckduckgo.com" in target_url:
+            resp = requests.post(target_url, data={"q": query}, headers=headers, timeout=3)
+        else:
+            resp = requests.get(target_url, headers=headers, timeout=3)
+
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                title = a.get_text(strip=True)
+                if len(title) > 8 and ('http' in href or href.startswith('http')):
+                    if not any(x in href for x in ['ads', 'track', 'login', 'signup', 'javascript', 'support']):
+                        res_list.append({
+                            'engine': engine_name,
+                            'title': title,
+                            'url': href,
+                            'snippet': f"Conteúdo indexado e recuperado simultaneamente via {engine_name}."
+                        })
+                        if len(res_list) >= 2: # Pega até 2 resultados por motor para não duplicar demais
+                            break
+    except Exception:
+        pass
+    return res_list
 
 @app.route("/")
 def index():
@@ -259,8 +334,21 @@ def index():
 @app.route("/search")
 def search():
     query = request.args.get("q", "")
-    category = request.args.get("category", "general")
-    return render_template_string(RESULTS_TEMPLATE, query=query, category=category)
+    all_results = []
+
+    if query:
+        # Executa as buscas nos 30 motores ao mesmo tempo usando multi-threading para ser super rápido
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(fetch_engine, engine, query) for engine in ENGINES]
+            for future in futures:
+                try:
+                    res = future.result()
+                    if res:
+                        all_results.extend(res)
+                except Exception:
+                    pass
+
+    return render_template_string(RESULTS_TEMPLATE, query=query, results=all_results[:35])
 
 @app.route("/autocomplete")
 def autocomplete():
